@@ -3,15 +3,22 @@
 var fs = require('fs');
 var mysql = require('mysql');
 var readline = require('readline');
+var async = require('async');
 
 var LABELS = 'labels.txt';
 var openStatements = 0;
 
 var decreaseStatementsAndCloseIfRequired = function() {
 	openStatements--;
+	console.log(openStatements);
 	if (openStatements === 0) {
 		connection.end();
 	}
+};
+
+var increaseStatements = function() {
+	openStatements++;
+	console.log(openStatements);
 };
 
 var parseTimestamp = function(fromFile) {
@@ -27,7 +34,7 @@ var parseTimestamp = function(fromFile) {
 };
 
 var getTransportationMeanId = function(transportationMean, semanticSubTrajectoryValues, fn) {
-	openStatements++;
+	increaseStatements();
 	connection.query('SELECT * FROM TransportationMean WHERE description = ?', [transportationMean], function(err, rows, fields) {
   		if (err) throw err;
 
@@ -49,7 +56,7 @@ var getTransportationMeanId = function(transportationMean, semanticSubTrajectory
 };
 
 var parseLabels = function(objectId, baseDir, dataDir) {
-	openStatements++;
+	increaseStatements();
 	var semanticTrajectoryValues = {idObject: objectId};
 	connection.query('INSERT INTO SemanticTrajectory SET ?', semanticTrajectoryValues, function(err, result) {
   		if (err) throw err;
@@ -69,7 +76,6 @@ var parseLabels = function(objectId, baseDir, dataDir) {
 			var start = new Date(lineValues[0]);
 			var finish = new Date(lineValues[1]);
 			var transportationMean = lineValues[2];
-			openStatements++;
 			var semanticSubTrajectoryValues = {
 				idSemanticTrajectory: result.insertId,
 				startTime: start,
@@ -77,11 +83,11 @@ var parseLabels = function(objectId, baseDir, dataDir) {
 			};
 			
 			getTransportationMeanId(transportationMean, semanticSubTrajectoryValues, function(semanticSubTrajectoryValues) {
-				openStatements++;
+				increaseStatements();
 				connection.query('INSERT INTO SemanticSubTrajectory SET ?', semanticSubTrajectoryValues, function(err, result) {
 		  			if (err) throw err;
+			  		decreaseStatementsAndCloseIfRequired();
 		  		});
-		  		decreaseStatementsAndCloseIfRequired();
 			});
 		    // console.log(objectId, line);
 		});
@@ -92,7 +98,7 @@ var parseLabels = function(objectId, baseDir, dataDir) {
 };
 
 var parseObjects = function (baseDir, dataDir) {
-	openStatements++;
+	increaseStatements();
 	connection.query('SELECT * FROM Object WHERE name = ?', [dataDir], function(err, rows, fields) {
   		if (err) throw err;
 
